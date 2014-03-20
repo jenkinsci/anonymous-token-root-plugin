@@ -1,0 +1,73 @@
+This document is organized in the order it should be implemented.  Test values should be in place during the development to fill the void of missing logic from the later stages.  Unit testing should ideally be written beforehand.
+
+###
+
+Path for anonmymous access to api URL:
+http://<jenkins-server>/requestByToken/api?param1=value&param2=value
+Path for anonmymous access to artifact URL:
+http://<jenkins-server>/requestByToken/artifact?param1=value&param2=value
+
+###
+
+Allowed parameters and values from the anonymous user.  These should be strictly whitelisted.
+API PARAMS LIST
+job=string
+pretty=boolean (string of true or false)
+type=xml|json|python
+build=lastFailedBuild|lastStableBuild|lastSuccessfulBuild|lastUnstableBuild|lastUnsuccessfulBuild|buildNumber|buildTimestamp|n where n is an integer
+anonymous_token=string
+
+ARTIFACT PARAMS LIST
+job=string
+build=lastFailedBuild|lastStableBuild|lastSuccessfulBuild|lastUnstableBuild|lastUnsuccessfulBuild|buildNumber|buildTimestamp|n where n is an integer
+anonymous_token=string
+artifact=string
+
+###
+
+Default parameter values inside the plugin if the anonymous user omits the parameter.
+job=None
+pretty=false
+type=json
+build=lastSuccessfulBuild
+anonymous_token=None
+artifact=None
+
+###
+
+Implement a whitelist of the parameters for both the artifact and api calls matching the "Allowed parameters".
+
+###
+
+anonymous_token authorization strategy for both artifact url and api url
+if job UI config anonymous_token_setting is disabled for job:
+  Access Denied (return HTTP 403 Forbidden)
+else if anonymous provided anonymous_token == "":
+  Access Denied (return HTTP 403 Forbidden)
+else if anonymous provided anonymous_token does not match job anonymous_token value:
+  Access Denied (return HTTP 403 Forbidden)
+else if job or build does not exist:
+  Access Denied (return HTTP 404 Not Found)
+
+if artifact url and artifact == "":
+  Null artifact path (return HTTP 400 Bad Request)
+
+###
+
+Building the proxying URLs based on provided parameters passing whitelist and anonymous_token authorization strategy.  Brackets "[]" mean optional addition to the URL.  (?|&) mean preceeded by ? or & depending if tree parameter is present.  The tree parameter being present will depend upon the anonymous_tree_filter from the UI having a value.
+
+Request Artifact URL is https://<jenkins-server>/job/%{job}/%{build}/artifact/%{artifact}
+Request API URL is https://<jenkins-server>/job/%{job}/%{build}/api/%{type} [?tree=%{anonymous_tree_filter}] [(?|&)pretty=%{pretty}]
+
+###
+
+User Interface in the job config.
+The settings should be found under the general job config.  This is beneath but in the same section as the job project name and job description.
+
+The checkbox to enable the config should be titled "Enable anonymous token security" i.e. the display value for the label.  The help text should be "This provides anonymous users (who aren't authenticated with Jenkins when Global Security is configured and restricted) access to the API and artifacts of this job.  Access is restricted by an anonymous access token which is used for authorization to access the API and artifacts of this job.  Verbosity of the results returned can be limited by the tree filter.  Access this job through the following URLs: <code>/requestByToken/api?job=%{job}&anonymous_token=%{anonymous_token}&pretty=true&...</code> and <code>/requestByToken/artifact?job=%{job}&anonymous_token=%{anonymous_token}&artifact=...</code>."
+
+There should be two settings.
+
+anonymous_token (display value is "Anonymous access token") (text field) (default value is "") (help text="This token will be used to provide anonymous users access to the build API for this job and for downloading artifacts.  Be sure to set this to a strong value which is unique to this job.")
+
+anonymous_tree_filter (display value is "Tree filter") (text field) (default value is "artifacts[fileName,relativePath]") (help text="This is the same tree filter used in API access.  This is to control which values are allowed to be returned to the anonymously authenticated user.  To return the full API text simply leave this field blank.
