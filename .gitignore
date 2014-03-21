@@ -1,3 +1,6 @@
 target
 work
+.classpath
+.project
+.settings
 *.swp
